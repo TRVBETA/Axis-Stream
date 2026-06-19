@@ -599,7 +599,12 @@ function addToHI(item){const hi=getHI();hi[`${item._type}_${item.id}`]={...item,
 
 // ── SHAREABLE LINKS ──
 function applyHash(){
-  const h=location.hash.slice(1);if(!h)return;
+  const h=location.hash.slice(1);
+  // If hash is empty or not a player route, kill the player
+  if(!h || (!h.startsWith('movie/') && !h.startsWith('tv/'))){
+    killPlayer();
+    return;
+  }
   const parts=h.split('/'); // movie/123 or tv/123
   if(parts.length>=2&&(parts[0]==='movie'||parts[0]==='tv')){
     const type=parts[0];const id=parseInt(parts[1]);
@@ -607,7 +612,26 @@ function applyHash(){
     tmdb(`/${type}/${id}`).then(data=>{if(data.id){data.media_type=type;openPlayer(data,type)}});
   }
 }
+
+// Kill iframe completely — stops all audio/video
+function killPlayer(){
+  const iframe=document.getElementById('p-iframe');
+  iframe.src='about:blank';
+  if(document.getElementById('player-view').classList.contains('show')){
+    document.getElementById('player-view').classList.remove('show');
+    showPage(prevPage||'home');
+  }
+}
+
 window.addEventListener('hashchange',applyHash);
+
+// Also handle browser back/forward buttons via popstate
+window.addEventListener('popstate',()=>{
+  const h=location.hash.slice(1);
+  if(!h || (!h.startsWith('movie/') && !h.startsWith('tv/'))){
+    killPlayer();
+  }
+});
 
 function shareLink(){
   if(!currentItem)return;
@@ -628,7 +652,11 @@ async function openPlayer(item,type){
     release_date:item.release_date||item.first_air_date||'',
     vote_average:item.vote_average,media_type:t,
   };
-  location.hash=`${t}/${item.id}`;
+  // Push to history so browser back button works
+  const newHash=`#${t}/${item.id}`;
+  if(location.hash!==newHash){
+    history.pushState({player:true},null,newHash);
+  }
 
   ['home','genres','watchlist','history'].forEach(k=>
     document.getElementById('page-'+k).style.display='none');
@@ -705,9 +733,15 @@ async function onSeasonChange(){currentSeason=parseInt(document.getElementById('
 function onEpisodeChange(){currentEpisode=parseInt(document.getElementById('sel-e').value);loadStream()}
 
 function closePlayer(){
-  document.getElementById('p-iframe').src='';
+  document.getElementById('p-iframe').src='about:blank';
   document.getElementById('player-view').classList.remove('show');
-  location.hash='';showPage(prevPage||'home');
+  // Use history.back if we came from within the app, otherwise clear hash
+  if(history.length>1){
+    history.back();
+  } else {
+    location.hash='';
+    showPage(prevPage||'home');
+  }
 }
 
 // ── SEARCH ──
@@ -798,6 +832,5 @@ async function init(){
 }
 init();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0e2f5c7586612ab',t:'MTc4MTg3NjU3OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0e3059c9997b5f9',t:'MTc4MTg3NzIyNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
