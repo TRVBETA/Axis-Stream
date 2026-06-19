@@ -523,6 +523,12 @@ function makeCard(item,opts={}){
 // ── PAGES ──
 function showPage(p){
   prevPage=currentPage;currentPage=p;
+  // Kill player audio if navigating away
+  if(document.getElementById('player-view').classList.contains('show')){
+    document.getElementById('p-iframe').src='about:blank';
+    currentItem=null;
+    history.replaceState(null,null,' ');
+  }
   ['home','genres','watchlist','history'].forEach(k=>
     document.getElementById('page-'+k).style.display=k===p?'':'none');
   document.getElementById('player-view').classList.remove('show');
@@ -532,7 +538,15 @@ function showPage(p){
   if(p==='history')renderHI();
   if(p==='genres'&&!activeGenre)initGenres();
 }
-function goHome(){showPage('home')}
+function goHome(){
+  // Kill player if it's open
+  const iframe=document.getElementById('p-iframe');
+  iframe.src='about:blank';
+  currentItem=null;
+  document.getElementById('player-view').classList.remove('show');
+  history.replaceState(null,null,' ');
+  showPage('home');
+}
 
 function initGenres(){
   const bar=document.getElementById('genre-bar');
@@ -600,15 +614,17 @@ function addToHI(item){const hi=getHI();hi[`${item._type}_${item.id}`]={...item,
 // ── SHAREABLE LINKS ──
 function applyHash(){
   const h=location.hash.slice(1);
-  // If hash is empty or not a player route, kill the player
   if(!h || (!h.startsWith('movie/') && !h.startsWith('tv/'))){
     killPlayer();
     return;
   }
-  const parts=h.split('/'); // movie/123 or tv/123
+  const parts=h.split('/');
   if(parts.length>=2&&(parts[0]==='movie'||parts[0]==='tv')){
     const type=parts[0];const id=parseInt(parts[1]);
     if(!id)return;
+    // Don't re-open if already viewing this item
+    if(currentItem && currentItem.id===id && currentItem._type===type
+       && document.getElementById('player-view').classList.contains('show')) return;
     tmdb(`/${type}/${id}`).then(data=>{if(data.id){data.media_type=type;openPlayer(data,type)}});
   }
 }
@@ -617,6 +633,7 @@ function applyHash(){
 function killPlayer(){
   const iframe=document.getElementById('p-iframe');
   iframe.src='about:blank';
+  currentItem=null;
   if(document.getElementById('player-view').classList.contains('show')){
     document.getElementById('player-view').classList.remove('show');
     showPage(prevPage||'home');
@@ -624,14 +641,6 @@ function killPlayer(){
 }
 
 window.addEventListener('hashchange',applyHash);
-
-// Also handle browser back/forward buttons via popstate
-window.addEventListener('popstate',()=>{
-  const h=location.hash.slice(1);
-  if(!h || (!h.startsWith('movie/') && !h.startsWith('tv/'))){
-    killPlayer();
-  }
-});
 
 function shareLink(){
   if(!currentItem)return;
@@ -652,11 +661,8 @@ async function openPlayer(item,type){
     release_date:item.release_date||item.first_air_date||'',
     vote_average:item.vote_average,media_type:t,
   };
-  // Push to history so browser back button works
-  const newHash=`#${t}/${item.id}`;
-  if(location.hash!==newHash){
-    history.pushState({player:true},null,newHash);
-  }
+  // Set hash for shareable links (replaceState so back button doesn't stack)
+  history.replaceState(null,null,`#${t}/${item.id}`);
 
   ['home','genres','watchlist','history'].forEach(k=>
     document.getElementById('page-'+k).style.display='none');
@@ -735,13 +741,9 @@ function onEpisodeChange(){currentEpisode=parseInt(document.getElementById('sel-
 function closePlayer(){
   document.getElementById('p-iframe').src='about:blank';
   document.getElementById('player-view').classList.remove('show');
-  // Use history.back if we came from within the app, otherwise clear hash
-  if(history.length>1){
-    history.back();
-  } else {
-    location.hash='';
-    showPage(prevPage||'home');
-  }
+  currentItem=null;
+  history.replaceState(null,null,' ');// clean hash without adding history entry
+  showPage(prevPage||'home');
 }
 
 // ── SEARCH ──
@@ -832,5 +834,5 @@ async function init(){
 }
 init();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0e3059c9997b5f9',t:'MTc4MTg3NzIyNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0e30f082dde536f',t:'MTc4MTg3NzYxMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
